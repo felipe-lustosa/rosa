@@ -28,6 +28,7 @@ try:
         ros2_param_list,
         ros2_param_get,
         ros2_param_set,
+        ros2_service_call,
     )
 except ModuleNotFoundError:
     pass
@@ -281,6 +282,45 @@ class TestROS2Tools(unittest.TestCase):
             }
         )
         self.assertEqual(result, {"error": "Invalid command"})
+
+    @patch("src.rosa.tools.ros2.subprocess.check_output")
+    def test_execute_does_not_use_shell(self, mock_check_output):
+        mock_check_output.return_value = b""
+        execute_ros_command("ros2 node list")
+        mock_check_output.assert_called_once_with(["ros2", "node", "list"])
+
+    @patch("src.rosa.tools.ros2.subprocess.check_output")
+    def test_topic_echo_passes_malicious_topic_as_single_argument(
+        self, mock_check_output
+    ):
+        mock_check_output.return_value = b"data: 1\n"
+        topic = "/chatter; touch /tmp/pwned"
+        ros2_topic_echo.invoke({"topic": topic, "delay": 0})
+        args = mock_check_output.call_args.args[0]
+        self.assertEqual(args[:4], ["ros2", "topic", "echo", topic])
+        self.assertNotIn("shell", mock_check_output.call_args.kwargs)
+
+    @patch("src.rosa.tools.ros2.subprocess.check_output")
+    def test_service_call_passes_request_as_single_argument(self, mock_check_output):
+        mock_check_output.return_value = b"response\n"
+        request = '{a: 1}" && rm -rf ~ && echo "'
+        ros2_service_call.invoke(
+            {
+                "service_name": "/add_two_ints",
+                "srv_type": "example_interfaces/srv/AddTwoInts",
+                "request": request,
+            }
+        )
+        mock_check_output.assert_called_once_with(
+            [
+                "ros2",
+                "service",
+                "call",
+                "/add_two_ints",
+                "example_interfaces/srv/AddTwoInts",
+                request,
+            ]
+        )
 
 
 if __name__ == "__main__":

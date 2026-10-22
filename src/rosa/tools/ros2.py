@@ -14,24 +14,29 @@
 
 import os
 import re
+import shlex
 import subprocess
 import time
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Union
 
 from langchain.agents import tool
 from rclpy.logging import get_logging_directory
 
 
-def execute_ros_command(command: str) -> Tuple[bool, str]:
+def execute_ros_command(command: Union[str, List[str]]) -> Tuple[bool, str]:
     """
     Execute a ROS2 command.
 
-    :param command: The ROS2 command to execute.
+    The command is run without a shell, so shell metacharacters in arguments (e.g. `;`, `|`, `$()`)
+    are passed to ros2 literally instead of being interpreted.
+
+    :param command: The ROS2 command to execute, as a string or a list of arguments. Use a list when an
+        argument comes from untrusted input (e.g. the LLM) so it cannot be split into extra arguments.
     :return: A tuple containing a boolean indicating success and the output of the command.
     """
 
     # Validate the command is a proper ROS2 command
-    cmd = command.split(" ")
+    cmd = shlex.split(command) if isinstance(command, str) else list(command)
     valid_ros2_commands = ["node", "topic", "service", "param", "doctor"]
 
     if len(cmd) < 2:
@@ -42,7 +47,7 @@ def execute_ros_command(command: str) -> Tuple[bool, str]:
         raise ValueError(f"'ros2 {cmd[1]}' is not a valid ros2 subcommand.")
 
     try:
-        output = subprocess.check_output(command, shell=True).decode()
+        output = subprocess.check_output(cmd).decode()
         return True, output
     except Exception as e:
         return False, str(e)
@@ -132,7 +137,7 @@ def ros2_topic_echo(
     :note: Do not set return_echoes to True if the number of messages is large.
            This will cause the response to be too large and may cause the tool to fail.
     """
-    cmd = f"ros2 topic echo {topic} --once --spin-time {timeout}"
+    cmd = ["ros2", "topic", "echo", topic, "--once", "--spin-time", str(timeout)]
 
     if count < 1 or count > 10:
         return {"error": "Count must be between 1 and 10."}
@@ -181,7 +186,7 @@ def ros2_node_info(nodes: List[str]) -> dict:
 
     for node_name in nodes:
 
-        cmd = f"ros2 node info {node_name}"
+        cmd = ["ros2", "node", "info", node_name]
         success, output = execute_ros_command(cmd)
         if not success:
             data[node_name] = dict(error=output)
@@ -201,7 +206,7 @@ def ros2_topic_info(topics: List[str]) -> dict:
     data = {}
 
     for topic in topics:
-        cmd = f"ros2 topic info {topic} --verbose"
+        cmd = ["ros2", "topic", "info", topic, "--verbose"]
         success, output = execute_ros_command(cmd)
         if not success:
             topic_info = dict(error=output)
@@ -226,7 +231,7 @@ def ros2_param_list(
     :param pattern: A regular expression pattern to filter the list of parameters.
     """
     if node_name:
-        cmd = f"ros2 param list {node_name}"
+        cmd = ["ros2", "param", "list", node_name]
         success, output = execute_ros_command(cmd)
         if not success:
             return {"error": output}
@@ -277,7 +282,7 @@ def ros2_param_get(node_name: str, param_name: str) -> dict:
     :param node_name: The name of the ROS2 node.
     :param param_name: The name of the parameter.
     """
-    cmd = f"ros2 param get {node_name} {param_name}"
+    cmd = ["ros2", "param", "get", node_name, param_name]
     success, output = execute_ros_command(cmd)
 
     if not success:
@@ -295,7 +300,7 @@ def ros2_param_set(node_name: str, param_name: str, param_value: str) -> dict:
     :param param_name: The name of the parameter.
     :param param_value: The value to set the parameter to.
     """
-    cmd = f"ros2 param set {node_name} {param_name} {param_value}"
+    cmd = ["ros2", "param", "set", node_name, param_name, param_value]
     success, output = execute_ros_command(cmd)
 
     if not success:
@@ -314,7 +319,7 @@ def ros2_service_info(services: List[str]) -> dict:
     data = {}
 
     for service_name in services:
-        cmd = f"ros2 service type {service_name}"
+        cmd = ["ros2", "service", "type", service_name]
         success, output = execute_ros_command(cmd)
 
         if not success:
@@ -335,7 +340,7 @@ def ros2_service_call(service_name: str, srv_type: str, request: str) -> dict:
     :param srv_type: The type of the service (use ros2_service_info to verify).
     :param request: The request to send to the service.
     """
-    cmd = f'ros2 service call {service_name} {srv_type} "{request}"'
+    cmd = ["ros2", "service", "call", service_name, srv_type, request]
     success, output = execute_ros_command(cmd)
     if not success:
         return {"error": output}

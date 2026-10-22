@@ -13,6 +13,7 @@
 #  limitations under the License.
 
 import os
+import subprocess
 import time
 from typing import Optional, List
 
@@ -744,7 +745,9 @@ def roslaunch(package: str, launch_file: str) -> str:
     :param launch_file: The name of the launch file to launch.
     """
     try:
-        os.system(f"roslaunch {package} {launch_file}")
+        # No shell, so LLM-provided names cannot inject commands; Popen also avoids blocking the
+        # agent for as long as the launched nodes are running.
+        subprocess.Popen(["roslaunch", package, launch_file])
         return f"Launched ROS launch file '{launch_file}' in package '{package}'."
     except Exception as e:
         return f"Failed to launch ROS launch file '{launch_file}' in package '{package}': {e}"

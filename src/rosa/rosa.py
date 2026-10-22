@@ -294,8 +294,8 @@ class ROSA:
         self, robot_prompts: Optional[RobotSystemPrompts] = None
     ) -> ChatPromptTemplate:
         """Create a chat prompt template from the system prompts and robot-specific prompts."""
-        # Start with default system prompts
-        prompts = system_prompts
+        # Start with a copy of the default system prompts so the shared module-level list is never mutated
+        prompts = list(system_prompts)
 
         # Add robot-specific prompts if provided
         if robot_prompts:
