@@ -21,16 +21,17 @@ from langchain_openai import ChatOpenAI
 def get_llm(streaming: bool = False):
     """A helper function to get the LLM instance.
 
-    Supports OpenAI (default), Anthropic and Ollama models.
+    Supports OpenAI (default), Anthropic, Google and Ollama models.
     Set the LLM_PROVIDER env variable to switch between providers:
       - "openai" (default): uses OPENAI_API_KEY
       - "anthropic": uses ANTHROPIC_API_KEY
+      - "google": uses GOOGLE_API_KEY (Gemini models)
       - "ollama": uses local Ollama instance
     """
     dotenv.load_dotenv(dotenv.find_dotenv())
 
     provider = os.getenv("LLM_PROVIDER", "openai").lower().strip()
-    supported = ("openai", "anthropic", "ollama")
+    supported = ("openai", "anthropic", "google", "ollama")
     if provider not in supported:
         raise ValueError(
             f"Unknown LLM_PROVIDER: '{provider}'. Must be one of: {', '.join(supported)}"
@@ -53,6 +54,19 @@ def get_llm(streaming: bool = False):
         llm = ChatAnthropic(
             api_key=get_env_variable("ANTHROPIC_API_KEY"),
             model=os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-5"),
+            streaming=streaming,
+        )
+    elif provider == "google":
+        try:
+            from langchain_google_genai import ChatGoogleGenerativeAI
+        except ImportError:
+            raise ImportError(
+                "langchain-google-genai is required for Google support. "
+                "Install it with: pip install langchain-google-genai"
+            )
+        llm = ChatGoogleGenerativeAI(
+            google_api_key=get_env_variable("GOOGLE_API_KEY"),
+            model=os.getenv("GOOGLE_MODEL", "gemini-2.5-flash"),
             streaming=streaming,
         )
     elif provider == "ollama":

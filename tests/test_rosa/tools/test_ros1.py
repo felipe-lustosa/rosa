@@ -36,6 +36,7 @@ try:
         rospkg_list,
         rospkg_roots,
         roslog_list,
+        roslaunch,
     )
 except ModuleNotFoundError:
     pass
@@ -597,6 +598,12 @@ class TestROS1Tools(unittest.TestCase):
             entities,
             ["There are currently no topics available matching the specified pattern."],
         )
+
+    @patch("src.rosa.tools.ros1.subprocess.Popen")
+    def test_roslaunch_passes_arguments_without_shell(self, mock_popen):
+        launch_file = "agent.launch; touch /tmp/pwned"
+        roslaunch.invoke({"package": "turtle_agent", "launch_file": launch_file})
+        mock_popen.assert_called_once_with(["roslaunch", "turtle_agent", launch_file])
 
 
 if __name__ == "__main__":

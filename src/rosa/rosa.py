@@ -28,6 +28,7 @@ from langchain_openai import AzureChatOpenAI, ChatOpenAI
 
 if TYPE_CHECKING:
     from langchain_anthropic import ChatAnthropic
+    from langchain_google_genai import ChatGoogleGenerativeAI
     from langchain_ollama import ChatOllama
 
 from .prompts import RobotSystemPrompts, system_prompts
@@ -37,7 +38,9 @@ logger = logging.getLogger(__name__)
 
 # Tested providers for static analysis; BaseChatModel accepted at runtime.
 if TYPE_CHECKING:
-    ChatModel = Union[ChatOpenAI, AzureChatOpenAI, ChatAnthropic, ChatOllama]
+    ChatModel = Union[
+        ChatOpenAI, AzureChatOpenAI, ChatAnthropic, ChatGoogleGenerativeAI, ChatOllama
+    ]
 else:
     ChatModel = BaseChatModel
 
@@ -49,7 +52,7 @@ class ROSA:
     Args:
         ros_version (Literal[1, 2]): The version of ROS that the agent will interact with.
         llm (ChatModel): The language model to use for generating responses. Tested providers:
-            ChatOpenAI, AzureChatOpenAI, ChatAnthropic, and ChatOllama. Other BaseChatModel
+            ChatOpenAI, AzureChatOpenAI, ChatAnthropic, ChatGoogleGenerativeAI, and ChatOllama. Other BaseChatModel
             subclasses that support tool calling may work but are not officially tested.
             Note: token usage tracking is only supported for ChatOpenAI and AzureChatOpenAI.
         tools (Optional[list]): A list of additional LangChain tool functions to use with the agent.
@@ -294,8 +297,8 @@ class ROSA:
         self, robot_prompts: Optional[RobotSystemPrompts] = None
     ) -> ChatPromptTemplate:
         """Create a chat prompt template from the system prompts and robot-specific prompts."""
-        # Start with default system prompts
-        prompts = system_prompts
+        # Start with a copy of the default system prompts so the shared module-level list is never mutated
+        prompts = list(system_prompts)
 
         # Add robot-specific prompts if provided
         if robot_prompts:
